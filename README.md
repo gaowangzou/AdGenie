@@ -24,7 +24,7 @@ code/
 │   │       ├── tools/       # 图像/视频/3D/语音/理解等 LangChain 工具
 │   │       └── utils/       # 日志、人脸检测等工具
 │   └── frontend/       # React + Excalidraw 无限画布前端
-└── SimCT--main/        # 跨分词器在线策略蒸馏训练框架（AdGenie 模型降本方案）
+└── OPD/        # 跨分词器在线策略蒸馏训练框架（AdGenie 模型降本方案）
 ```
 
 ## 快速开始
