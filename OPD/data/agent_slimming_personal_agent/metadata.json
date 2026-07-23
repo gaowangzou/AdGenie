@@ -1,0 +1,8 @@
+{
+  "role": "personal_agent",
+  "num_train": 74,
+  "num_eval": 9,
+  "teacher_model": "Qwen2.5-7B-Instruct",
+  "student_model": "gemma-2-2b-it",
+  "collected_at": ""
+}
