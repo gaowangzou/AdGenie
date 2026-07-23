@@ -1,0 +1,29 @@
+# --- secrets ---
+.env
+*.env
+!*/env.example
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# --- Node / frontend ---
+node_modules/
+dist/
+.vite/
+
+# --- backend runtime artifacts (generated at runtime, not source) ---
+agent/backend/logs/
+agent/backend/storage/
+agent/backend/workspace/
+
+# --- SimCT personal/generated data ---
+SimCT--main/data/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
