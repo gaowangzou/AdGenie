@@ -14,11 +14,16 @@ logger = logging.getLogger(__name__)
 class VolcanoLLMProvider(BaseLLMProvider):
     """火山引擎 LLM 提供商"""
     
-    def __init__(self):
+    def __init__(
+        self,
+        model_name: Optional[str] = None,
+        base_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+    ):
         # 从环境变量获取配置（与图片生成保持一致，使用 VOLCANO_ 前缀）
-        self.api_key = os.getenv("VOLCANO_API_KEY", "").strip()
-        self.base_url = os.getenv("VOLCANO_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3").strip()
-        self.model_name = os.getenv("VOLCANO_MODEL_NAME", "doubao-seed-1-6-251015").strip()
+        self.api_key = (api_key if api_key is not None else os.getenv("VOLCANO_API_KEY", "")).strip()
+        self.base_url = (base_url if base_url is not None else os.getenv("VOLCANO_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")).strip()
+        self.model_name = (model_name if model_name is not None else os.getenv("VOLCANO_MODEL_NAME", "doubao-seed-1-6-251015")).strip()
         # thinking 功能配置
         thinking_enabled = os.getenv("VOLCANO_THINKING_ENABLED", "false").lower() == "true"
         self.thinking_type = "enabled" if thinking_enabled else "disabled"

@@ -75,10 +75,19 @@ class ModelRouter:
         """
         router_data = self._load()
 
-        # 获取该角色的预设信息
-        preset = ROLE_PRESETS.get(role, ROLE_PRESETS["personal_agent"])
+        existing_entry = router_data.get("models", {}).get(role, {})
+        if not isinstance(existing_entry, dict):
+            existing_entry = {}
 
         entry = {
+            # Runtime routing fields. OPD registration preserves existing endpoint
+            # settings; a checkpoint is not callable until it is served through an
+            # OpenAI-compatible endpoint and enabled here.
+            "enabled": existing_entry.get("enabled", False),
+            "provider": existing_entry.get("provider", ""),
+            "model": existing_entry.get("model", model_name),
+            "base_url": existing_entry.get("base_url", ""),
+            "api_key_env": existing_entry.get("api_key_env", ""),
             "primary": model_name,
             "fallback": self.config.teacher_model,
             "checkpoint": model_path,
@@ -111,9 +120,11 @@ class ModelRouter:
         router_data = self._load()
         if role in router_data["models"]:
             return router_data["models"][role]
+        default_entry = router_data.get("default", {})
+        default_model = default_entry.get("model", "") if isinstance(default_entry, dict) else default_entry
         return {
-            "primary": router_data["default"],
-            "fallback": router_data["default"],
+            "primary": default_model,
+            "fallback": default_model,
             "checkpoint": "",
             "note": "No distilled model available, using default",
         }
@@ -154,8 +165,14 @@ class ModelRouter:
         if not router_path.exists():
             router_path.parent.mkdir(parents=True, exist_ok=True)
             default_data = {
+                "enabled": False,
+                "default": {
+                    "provider": "",
+                    "model": self.config.teacher_model,
+                    "base_url": "",
+                    "api_key_env": "",
+                },
                 "models": {},
-                "default": self.config.teacher_model,
                 "updated_at": datetime.now().isoformat(),
             }
             with open(router_path, "w", encoding="utf-8") as f:

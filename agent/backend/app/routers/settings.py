@@ -11,7 +11,7 @@ import json
 import re
 import logging
 from app.services import skill_service
-from app.services import workspace_service
+from app.services import workspace_service, model_router_service
 
 logger = logging.getLogger(__name__)
 
@@ -204,6 +204,24 @@ async def get_installed_skill_content(skill_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to read SKILL.md: {e}")
     return {"id": skill_id, "content": content}
 
+
+# ─────────────────────────────────────────
+# 模型路由配置（OPD 蒸馏模型运行侧接入）
+# ─────────────────────────────────────────
+
+@router.get("/settings/model-router")
+async def get_model_router():
+    """返回 role -> model 的运行侧路由配置。"""
+    return model_router_service.load_model_router()
+
+
+@router.put("/settings/model-router")
+async def put_model_router(payload: dict[str, Any]):
+    """保存 role -> model 的运行侧路由配置。"""
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="model router payload must be an object")
+    model_router_service.save_model_router(payload)
+    return {"ok": True}
 
 # ─────────────────────────────────────────
 # MCP 服务器配置

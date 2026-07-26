@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from langchain_core.tools import tool
 from openai import OpenAI
 from pydantic import BaseModel, Field
+from app.services import model_router_service
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +189,39 @@ def _call_qwen_omni(
     return text_response, audio_url
 
 
+
+def _call_routed_image_understanding(messages: list, routed_model) -> str:
+    """
+    Call a routed OpenAI-compatible vision/chat model for image understanding.
+
+    This is intentionally limited to image inputs. Qwen3-Omni audio/video and
+    audio-output modes remain on the dedicated DashScope Omni API.
+    """
+    client = OpenAI(
+        api_key=routed_model.api_key or "EMPTY",
+        base_url=routed_model.base_url,
+    )
+    logger.info(
+        "🧭 使用 image_understanding 路由: provider=%s model=%s base_url=%s",
+        routed_model.provider,
+        routed_model.model,
+        routed_model.base_url,
+    )
+    completion = client.chat.completions.create(
+        model=routed_model.model,
+        messages=messages,
+        stream=True,
+    )
+
+    text_parts: list[str] = []
+    for chunk in completion:
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta
+        if delta.content:
+            text_parts.append(delta.content)
+    return "".join(text_parts)
+
 # ── Tool Schema & 实现 ────────────────────────────────────────────────────────
 
 class QwenOmniUnderstandInput(BaseModel):
@@ -310,11 +344,40 @@ def qwen_omni_understand_tool(
         ]
 
         # 5. 调用模型
-        text_response, audio_url = _call_qwen_omni(
-            messages=messages,
-            output_audio=output_audio,
-            voice=voice,
+        routed_model = (
+            model_router_service.resolve_model_for_role("image_understanding")
+            if detected_type == "image"
+            else None
         )
+        model_name = QWEN_OMNI_MODEL
+        provider_name = "qwen3-omni"
+        message = "多模态理解完成"
+        if routed_model:
+            try:
+                text_response = _call_routed_image_understanding(messages, routed_model)
+                audio_url = None
+                model_name = routed_model.model
+                provider_name = f"model-router:{routed_model.provider}"
+                if output_audio:
+                    message = "图片理解完成；当前 image_understanding 路由只返回文字，未生成语音回答"
+            except Exception as route_error:
+                logger.warning(
+                    "⚠️ image_understanding 路由失败，回退 Qwen3-Omni: model=%s base_url=%s error=%s",
+                    routed_model.model,
+                    routed_model.base_url,
+                    route_error,
+                )
+                text_response, audio_url = _call_qwen_omni(
+                    messages=messages,
+                    output_audio=output_audio,
+                    voice=voice,
+                )
+        else:
+            text_response, audio_url = _call_qwen_omni(
+                messages=messages,
+                output_audio=output_audio,
+                voice=voice,
+            )
 
         # 6. 组装结果
         result: dict = {
@@ -322,9 +385,9 @@ def qwen_omni_understand_tool(
             "media_path": media_path,
             "media_type": detected_type,
             "question": question,
-            "model": QWEN_OMNI_MODEL,
-            "provider": "qwen3-omni",
-            "message": "多模态理解完成",
+            "model": model_name,
+            "provider": provider_name,
+            "message": message,
         }
         if audio_url:
             result["audio_url"] = audio_url

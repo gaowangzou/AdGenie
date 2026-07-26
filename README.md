@@ -48,7 +48,7 @@
 - **多工具链式调度**：LangGraph ReAct Agent 自主拆解任务，覆盖图像、视频、3D、语音、多模态理解 5 大模态，单请求最高支持 200 步递归推理，可自动完成 5-15 次连续链式任务
 - **流式增量渲染**：`StreamProcessor` 对工具调用参数分片实时解析，无需等待工具执行完成即可展示内容；SSE 主推流 + WebSocket 广播双通道，保障多终端同步
 - **轻量化技能加载**：仅预加载技能元数据，运行时动态调取完整规则，单轮技能 Token 消耗从 12000 压缩到 300；内置 6 项可运行时启停的自定义创作技能
-- **模型蒸馏降本**：基于 OPD 在线策略蒸馏 + SpanCTKD 跨分词器知识对齐，把编排 Agent、图片理解、TTS、视频脚本等角色管线从大模型蒸馏为小模型，ModelRouter 运行时智能路由，复杂场景自动回退大模型兜底
+- **模型蒸馏降本**：基于 OPD 在线策略蒸馏 + SpanCTKD 跨分词器知识对齐，把编排 Agent、图片理解、TTS、视频脚本等角色管线从大模型蒸馏为小模型；运行侧通过 `storage/model_router.json` 将 `agent_orchestration`、`image_understanding`、`video_script`、`tts_voice`、`personal_agent` 五个 role 路由到已部署的小模型 endpoint，未配置时自动走默认模型/API
 - **媒体后处理**：sRGB 色彩归一化、3D 模型贴图路径修复、视频无损级联剪辑、音频多段拼接与 BGM 混音
 - **分层长期记忆**：Tier 0 人工配置 + SQLite 结构化长期记忆 + canvas 会话摘要 + 本地轻量检索注入；`MEMORY.md` 作为可读镜像，避免全量记忆塞入 System Prompt
 - **无限画布前端**：Excalidraw + Three.js，素材可视化预览与异步媒体队列缓冲；LLM 层工厂模式适配多模型服务商
@@ -70,7 +70,7 @@ code/
 
 ## 模型蒸馏降本（OPD）
 
-线上推理成本高昂的编排 Agent / 图片理解 / TTS / 视频脚本等角色管线，通过 [`OPD/`](OPD) 训练框架蒸馏为可独立部署的小模型：Teacher/Student 双 Actor 通过 Ray 分布式调度，支持在线策略（on-policy）与离线策略（off-policy）两种蒸馏模式，并用 SpanCTKD 解决教师/学生分词器不一致的跨分词器知识对齐问题；蒸馏后由 `ModelRouter` 在运行时按场景复杂度自动路由，复杂请求兜底回退大模型。
+线上推理成本高昂的编排 Agent / 图片理解 / TTS / 视频脚本等角色管线，通过 [`OPD/`](OPD) 训练框架蒸馏为可独立部署的小模型：Teacher/Student 双 Actor 通过 Ray 分布式调度，支持在线策略（on-policy）与离线策略（off-policy）两种蒸馏模式，并用 SpanCTKD 解决教师/学生分词器不一致的跨分词器知识对齐问题；蒸馏后由 `ModelRouter` 在运行时按已接通 role 路由；当前五个 role 都有运行时调用点，其中 `video_script`、`tts_voice`、`personal_agent` 作为规划/适配工具接入。没有真实 checkpoint 时，可以先用 `agent/backend/scripts/configure_model_router.py` 配置本地 OpenAI-compatible 小模型端点验证路由链路，再用 `agent/backend/scripts/verify_model_router_e2e.py` 跑 ReAct smoke test，详见 [`docs/adgenie/项目介绍/模型路由与OPD接入.md`](docs/adgenie/项目介绍/模型路由与OPD接入.md)。
 
 <p align="center">
   <img src="docs/assets/opd-architecture.png" alt="OPD 在线策略蒸馏架构图" width="720" />
@@ -85,6 +85,24 @@ code/
 | Python | 3.9+（推荐 3.11） |
 | Node.js | 18+（推荐 20+） |
 
+## 系统依赖
+
+媒体后处理依赖系统级 `ffmpeg` / `ffprobe`，不是 Python 虚拟环境里的包。视频拼接 `concatenate_videos` 通过 moviepy 调用 ffmpeg 编码；音频拼接、BGM 选择和混音通过 pydub 调用 ffmpeg/ffprobe 读取与导出音频。
+
+Windows 推荐安装：
+
+```powershell
+winget install --id Gyan.FFmpeg -e
+```
+
+安装后关闭并重开启动后端的终端，再验证：
+
+```powershell
+ffmpeg -version
+ffprobe -version
+```
+
+如果这两条命令不可用，视频拼接和音频处理工具会失败。
 ### 后端
 
 ```bash
@@ -141,4 +159,3 @@ npm run dev
 ## 常见问题
 
 排查步骤和更多细节见各模块内的文档；启动报错、依赖问题等可参考 `agent/backend` 下的日志输出（`logs/`）。
-
