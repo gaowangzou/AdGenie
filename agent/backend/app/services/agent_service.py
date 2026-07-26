@@ -1,4 +1,4 @@
-"""
+﻿"""
 Agent服务 - 处理LangGraph Agent的流式输出
 """
 import json
@@ -26,7 +26,7 @@ from app.services import workspace_service
 logger = logging.getLogger(__name__)
 
 
-def create_agent():
+def create_agent(current_query: Optional[str] = None, canvas_id: Optional[str] = None):
     """创建LangGraph Agent"""
     # 使用 LLM 工厂创建模型实例（默认使用火山引擎）
     model = create_llm()
@@ -71,7 +71,7 @@ def create_agent():
 
     # 使用prompt模块生成完整提示词
     skills_context = skill_service.get_skills_context()
-    workspace_context = workspace_service.get_workspace_context()
+    workspace_context = workspace_service.get_workspace_context(query=current_query, canvas_id=canvas_id)
     full_prompt = get_full_prompt(
         tools_list_text=tools_list_text,
         skills_context=skills_context,
@@ -92,7 +92,8 @@ def create_agent():
 
 async def process_chat_stream(
     messages: List[Dict[str, Any]],
-    session_id: Optional[str] = None
+    session_id: Optional[str] = None,
+    canvas_id: Optional[str] = None
 ) -> AsyncGenerator[str, None]:
     """
     处理聊天流式响应
@@ -108,7 +109,12 @@ async def process_chat_stream(
         logger.info(f"💬 收到聊天请求: session_id={session_id}, messages_count={len(messages)}")
         
         # 创建Agent（在 langgraph 1.0.0 中，create_react_agent 返回的对象已经是编译后的）
-        agent = create_agent()
+        current_query = ""
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                current_query = msg.get("content", "")
+                break
+        agent = create_agent(current_query=current_query, canvas_id=canvas_id)
 
         # 创建流处理器
         processor = StreamProcessor(session_id)
@@ -146,4 +152,6 @@ async def process_chat_stream(
         except:
             # 如果发送失败（客户端已断开），忽略
             pass
+
+
 

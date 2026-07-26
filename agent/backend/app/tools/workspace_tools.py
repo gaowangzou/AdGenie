@@ -1,26 +1,33 @@
-"""
-Workspace Tools - Agent 主动写入工作空间记忆的工具
+﻿"""
+Workspace Tools - Agent 主动写入结构化长期记忆的工具。
+
+MEMORY.md 现在是可读镜像，真实长期记忆写入 storage/memory.sqlite3。
 """
 import logging
 from langchain_core.tools import tool
-from app.services import workspace_service
+from app.services import memory_service
 
 logger = logging.getLogger(__name__)
 
-# MEMORY.md 中合法的章节名
+# MEMORY.md 镜像中的合法章节名
 _VALID_SECTIONS = ["角色资产", "成功 Prompt 模板", "用户偏好记录"]
+_SECTION_TO_TYPE = {
+    "角色资产": "角色资产",
+    "成功 Prompt 模板": "prompt模板",
+    "用户偏好记录": "用户偏好",
+}
 
 
 @tool
 def write_memory(section: str, content: str) -> str:
     """
-    将重要创作信息追加写入 MEMORY.md 的指定章节。
+    将重要创作信息写入结构化长期记忆，并刷新 MEMORY.md 镜像。
     用于记录用户满意的角色资产、效果好的 Prompt 模板、用户明确的风格偏好等长期记忆。
 
     Args:
         section: 写入哪个章节，必须是以下之一：
                  "角色资产" / "成功 Prompt 模板" / "用户偏好记录"
-        content: 要追加到该章节的 Markdown 内容（一条或多条条目）
+        content: 要写入的 Markdown 内容（一条或多条条目）
 
     Returns:
         操作结果说明
@@ -29,34 +36,18 @@ def write_memory(section: str, content: str) -> str:
         return f"❌ 无效的章节名称：'{section}'。有效章节：{', '.join(_VALID_SECTIONS)}"
 
     try:
-        memory_content = workspace_service.load_workspace_file("MEMORY.md")
+        memory_id = memory_service.upsert_memory(
+            type=_SECTION_TO_TYPE[section],
+            content=content,
+            summary=content.strip()[:160],
+            scope_type="user",
+            scope_id="default_user",
+            confidence="confirmed",
+            source_session_id="write_memory_tool",
+            metadata={"section": section, "source": "agent_confirmed_memory"},
+        )
+        logger.info(f"✅ 成功写入结构化记忆 {memory_id} [{section}]")
+        return f"✅ 已成功写入长期记忆（{memory_id}），并刷新 MEMORY.md 镜像的「{section}」章节。"
     except Exception as e:
-        logger.error(f"读取 MEMORY.md 失败: {e}")
-        return f"❌ 读取 MEMORY.md 失败：{e}"
-
-    # 查找目标章节位置
-    section_header = f"## {section}"
-    if section_header not in memory_content:
-        # 章节不存在则追加到末尾
-        memory_content = memory_content.rstrip() + f"\n\n{section_header}\n{content.strip()}\n"
-    else:
-        # 在章节结尾追加内容（在下一个 ## 之前，或文件末尾）
-        idx = memory_content.index(section_header)
-        # 找到该章节结束位置（下一个 ## 开始处 或 文件末尾）
-        next_section_idx = memory_content.find("\n## ", idx + len(section_header))
-        if next_section_idx == -1:
-            # 没有下一个章节，追加到末尾
-            memory_content = memory_content.rstrip() + f"\n{content.strip()}\n"
-        else:
-            # 在下一章节前插入
-            before = memory_content[:next_section_idx].rstrip()
-            after = memory_content[next_section_idx:]
-            memory_content = before + f"\n{content.strip()}\n" + after
-
-    try:
-        workspace_service.save_workspace_file("MEMORY.md", memory_content)
-        logger.info(f"✅ 成功写入 MEMORY.md [{section}]")
-        return f"✅ 已成功将内容写入 MEMORY.md 的「{section}」章节。"
-    except Exception as e:
-        logger.error(f"写入 MEMORY.md 失败: {e}")
-        return f"❌ 写入 MEMORY.md 失败：{e}"
+        logger.error(f"写入结构化记忆失败: {e}")
+        return f"❌ 写入长期记忆失败：{e}"

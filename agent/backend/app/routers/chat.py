@@ -1,4 +1,4 @@
-"""
+﻿"""
 聊天路由 - 处理对话请求
 """
 from __future__ import annotations
@@ -16,6 +16,7 @@ from pathlib import Path
 from app.services.agent_service import process_chat_stream
 from app.services.history_service import history_service
 from app.services.connection_manager import manager
+from app.services import memory_service
 
 logger = logging.getLogger(__name__)
 
@@ -244,7 +245,7 @@ async def chat(request: ChatRequest):
             else:
                 await manager.broadcast_all(user_event)
 
-            async for chunk in process_chat_stream(messages, request.session_id):
+            async for chunk in process_chat_stream(messages, request.session_id, canvas_id=canvas_id):
                 yield chunk
                 if chunk.startswith("data: "):
                     data_str = chunk[len("data: "):].strip()
@@ -299,6 +300,7 @@ async def chat(request: ChatRequest):
                         existing_messages = existing.get("messages", [])
                         existing["messages"] = existing_messages + new_messages
                         await asyncio.to_thread(history_service.save_canvas, existing)
+                        effective_canvas_id = canvas_id
                     else:
                         # canvas_id 在历史中找不到（可能已删除），退化为新建
                         canvas_to_save = {
@@ -309,18 +311,37 @@ async def chat(request: ChatRequest):
                             "data": {"elements": [], "appState": {}, "files": {}},
                         }
                         await asyncio.to_thread(history_service.save_canvas, canvas_to_save)
+                        effective_canvas_id = canvas_id
                 else:
                     # 没有 canvas_id：新建项目
+                    new_canvas_id = f"canvas-{ts}"
                     new_canvas = {
-                        "id": f"canvas-{ts}",
+                        "id": new_canvas_id,
                         "name": request.message[:30],
                         "createdAt": ts,
                         "messages": new_messages,
                         "data": {"elements": [], "appState": {}, "files": {}},
                     }
                     await asyncio.to_thread(history_service.save_canvas, new_canvas)
+                    effective_canvas_id = new_canvas_id
+                if effective_canvas_id:
+                    await asyncio.to_thread(
+                        memory_service.upsert_session_digest,
+                        canvas_id=effective_canvas_id,
+                        user_message=request.message,
+                        assistant_content=assistant_content,
+                        tool_results=tool_results,
+                        previous_messages=messages,
+                    )
+                    await asyncio.to_thread(
+                        memory_service.extract_inferred_memories_from_turn,
+                        canvas_id=effective_canvas_id,
+                        user_message=request.message,
+                        assistant_content=assistant_content,
+                        tool_results=tool_results,
+                    )
             except Exception as e:
-                logger.warning(f"保存对话历史失败: {e}")
+                logger.warning(f"保存对话历史或维护记忆失败: {e}")
 
         # 返回流式响应 - 确保立即发送，不缓冲
         return StreamingResponse(
@@ -335,4 +356,8 @@ async def chat(request: ChatRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
 

@@ -1,10 +1,10 @@
-"""
+﻿"""
 Workspace Service - 管理工作空间身份记忆文件
 AGENTS.md / TOOLS.md / IDENTITY.md / USER.md / SOUL.md / MEMORY.md
 """
 import logging
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +126,17 @@ def save_workspace_file(filename: str, content: str) -> None:
         raise ValueError(f"未知的工作空间文件: {filename}")
     workspace_dir = get_workspace_dir()
     workspace_dir.mkdir(parents=True, exist_ok=True)
-    (workspace_dir / filename).write_text(content, encoding="utf-8")
+    file_path = workspace_dir / filename
+    file_path.write_text(content, encoding="utf-8")
+
+    if filename == "MEMORY.md":
+        try:
+            from app.services import memory_service
+            memory_service.import_memory_markdown(content, source_session_id="manual_memory_md")
+        except Exception as e:
+            logger.warning(f"导入手动编辑的 MEMORY.md 失败: {e}")
+            raise
+
     logger.info(f"💾 保存工作空间文件: {filename} ({len(content)} 字符)")
 
 
@@ -154,24 +164,21 @@ def _is_empty_or_template(content: str, filename: str) -> bool:
     return False
 
 
-def get_workspace_context() -> str:
+def get_workspace_context(query: Optional[str] = None, canvas_id: Optional[str] = None) -> str:
     """
     返回拼接好的工作空间 prompt 注入块。
-    仅注入有实质内容的文件，空文件/纯模板文件跳过。
 
-    <工作空间>
-        ## AGENTS.md（行为规则）
-        {content}
-
-        ## USER.md（用户画像）
-        {content}
-        ...
-    </工作空间>
-
+    Tier 0: 人工维护的身份/配置文件仍按文件注入。
+    Tier 1/2: MEMORY.md 不再全文注入；改为从结构化记忆和会话摘要中按需检索。
     """
     ensure_workspace_defaults()
     sections = []
+
+    # Tier 0: human-authored configuration. MEMORY.md is only a mirror view of
+    # structured memory and is intentionally excluded from full prompt injection.
     for filename, (display_name, _) in WORKSPACE_FILES.items():
+        if filename == "MEMORY.md":
+            continue
         try:
             content = load_workspace_file(filename)
         except Exception as e:
@@ -182,8 +189,20 @@ def get_workspace_context() -> str:
         truncated = _truncate(content)
         sections.append(f"## {filename}（{display_name}）\n{truncated}")
 
+    # Tier 1 + Tier 2: retrieved structured memories and current canvas digest.
+    if query:
+        try:
+            from app.services import memory_service
+            retrieved_context = memory_service.build_retrieved_memory_context(query, canvas_id=canvas_id)
+            if retrieved_context.strip():
+                sections.append("## STRUCTURED_MEMORY（按需检索记忆）\n" + retrieved_context)
+        except Exception as e:
+            logger.warning(f"检索结构化记忆失败: {e}")
+
     if not sections:
         return ""
 
     body = "\n\n".join(sections)
     return f"<工作空间>\n{body}\n</工作空间>"
+
+

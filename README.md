@@ -1,4 +1,4 @@
-# AdGenie
+﻿# AdGenie
 
 <p align="center">
   <img src="agent/frontend/public/logo.png" alt="AdGenie logo" width="96" />
@@ -50,7 +50,7 @@
 - **轻量化技能加载**：仅预加载技能元数据，运行时动态调取完整规则，单轮技能 Token 消耗从 12000 压缩到 300；内置 6 项可运行时启停的自定义创作技能
 - **模型蒸馏降本**：基于 OPD 在线策略蒸馏 + SpanCTKD 跨分词器知识对齐，把编排 Agent、图片理解、TTS、视频脚本等角色管线从大模型蒸馏为小模型，ModelRouter 运行时智能路由，复杂场景自动回退大模型兜底
 - **媒体后处理**：sRGB 色彩归一化、3D 模型贴图路径修复、视频无损级联剪辑、音频多段拼接与 BGM 混音
-- **跨会话记忆**：记忆读写工具自动留存用户创作偏好，分层截断策略实现无向量数据库的上下文延续
+- **分层长期记忆**：Tier 0 人工配置 + SQLite 结构化长期记忆 + canvas 会话摘要 + 本地轻量检索注入；`MEMORY.md` 作为可读镜像，避免全量记忆塞入 System Prompt
 - **无限画布前端**：Excalidraw + Three.js，素材可视化预览与异步媒体队列缓冲；LLM 层工厂模式适配多模型服务商
 
 ## 项目结构
@@ -61,7 +61,7 @@ code/
 │   ├── backend/        # FastAPI + LangGraph ReAct Agent
 │   │   └── app/
 │   │       ├── routers/    # API 路由（chat、settings）
-│   │       ├── services/   # Agent 编排、流式处理、历史/工作区/技能服务
+│   │       ├── services/   # Agent 编排、流式处理、历史/工作区/结构化记忆/技能服务
 │   │       ├── tools/       # 图像/视频/3D/语音/理解等 LangChain 工具
 │   │       └── utils/       # 日志、人脸检测等工具
 │   └── frontend/       # React + Excalidraw 无限画布前端
@@ -141,3 +141,4 @@ npm run dev
 ## 常见问题
 
 排查步骤和更多细节见各模块内的文档；启动报错、依赖问题等可参考 `agent/backend` 下的日志输出（`logs/`）。
+
