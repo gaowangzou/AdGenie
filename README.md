@@ -46,7 +46,7 @@
 ## 功能特性
 
 - **多工具链式调度**：LangGraph ReAct Agent 自主拆解任务，覆盖图像、视频、3D、语音、多模态理解 5 大模态，单请求最高支持 200 步递归推理，可自动完成 5-15 次连续链式任务
-- **显式 State / Observation 闭环**：LangGraph `state_schema` 声明 `AdGenieState`，`pre_model_hook` 把每次工具执行结果标准化为 `Observation`（是否成功、产物路径、错误类型、是否可重试）写回状态，并通过动态 prompt 回调让模型每一轮都能读到最新状态摘要，而非仅依赖原始 `ToolMessage` 文本推断进度；详见 [`docs/adgenie/项目介绍/核心流程完整分析.md`](docs/adgenie/项目介绍/核心流程完整分析.md)
+- **显式 State / Observation 闭环**：LangGraph `state_schema` 声明 `AdGenieState`，`pre_model_hook` 把每次工具执行结果标准化为 `Observation`（是否成功、产物路径、错误类型、是否可重试）写回状态，并通过动态 prompt 回调让模型每一轮都能读到最新状态摘要，而非仅依赖原始 `ToolMessage` 文本推断进度
 - **流式增量渲染**：`StreamProcessor` 对工具调用参数分片实时解析，无需等待工具执行完成即可展示内容；SSE 主推流 + WebSocket 广播双通道，保障多终端同步
 - **轻量化技能加载**：仅预加载技能元数据，运行时动态调取完整规则，单轮技能 Token 消耗从 12000 压缩到 300；内置 6 项可运行时启停的自定义创作技能
 - **模型蒸馏降本**：基于 OPD 在线策略蒸馏 + SpanCTKD 跨分词器知识对齐，把编排 Agent、图片理解、TTS、视频脚本等角色管线从大模型蒸馏为小模型；运行侧通过 `storage/model_router.json` 将 `agent_orchestration`、`image_understanding`、`video_script`、`tts_voice`、`personal_agent` 五个 role 路由到已部署的小模型 endpoint，未配置时自动走默认模型/API
@@ -71,7 +71,7 @@ code/
 
 ## 模型蒸馏降本（OPD）
 
-线上推理成本高昂的编排 Agent / 图片理解 / TTS / 视频脚本等角色管线，通过 [`OPD/`](OPD) 训练框架蒸馏为可独立部署的小模型：Teacher/Student 双 Actor 通过 Ray 分布式调度，支持在线策略（on-policy）与离线策略（off-policy）两种蒸馏模式，并用 SpanCTKD 解决教师/学生分词器不一致的跨分词器知识对齐问题；蒸馏后由 `ModelRouter` 在运行时按已接通 role 路由；当前五个 role 都有运行时调用点，其中 `video_script`、`tts_voice`、`personal_agent` 作为规划/适配工具接入。没有真实 checkpoint 时，可以先用 `agent/backend/scripts/configure_model_router.py` 配置本地 OpenAI-compatible 小模型端点验证路由链路，再用 `agent/backend/scripts/verify_model_router_e2e.py` 跑 ReAct smoke test，详见 [`docs/adgenie/项目介绍/模型路由与OPD接入.md`](docs/adgenie/项目介绍/模型路由与OPD接入.md)。
+线上推理成本高昂的编排 Agent / 图片理解 / TTS / 视频脚本等角色管线，通过 [`OPD/`](OPD) 训练框架蒸馏为可独立部署的小模型：Teacher/Student 双 Actor 通过 Ray 分布式调度，支持在线策略（on-policy）与离线策略（off-policy）两种蒸馏模式，并用 SpanCTKD 解决教师/学生分词器不一致的跨分词器知识对齐问题；蒸馏后由 `ModelRouter` 在运行时按已接通 role 路由；当前五个 role 都有运行时调用点，其中 `video_script`、`tts_voice`、`personal_agent` 作为规划/适配工具接入。没有真实 checkpoint 时，可以先用 `agent/backend/scripts/configure_model_router.py` 配置本地 OpenAI-compatible 小模型端点验证路由链路，再用 `agent/backend/scripts/verify_model_router_e2e.py` 跑 ReAct smoke test。
 
 <p align="center">
   <img src="docs/assets/opd-architecture.png" alt="OPD 在线策略蒸馏架构图" width="720" />
