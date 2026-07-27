@@ -105,7 +105,7 @@ OPTS+=" --preprocess_num_workers 8"
 OPTS+=" --packing_samples True"
 
 # Distillation
-OPTS+=" --kd_ratio 0.9"
+OPTS+=" --kd_ratio 1.0"
 OPTS+=" --kd_loss_fn rkl"
 OPTS+=" --kd_algorithm span_ctkd"
 OPTS+=" --teacher_dp_size 8"

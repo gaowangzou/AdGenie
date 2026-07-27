@@ -146,14 +146,14 @@ class SlimmingPipeline:
             )
             examples = examples + synthetic
 
-        # 清洗和格式标准化
+        # 清洗、去重、质量过滤、格式标准化
         simct_records = self.data_preparer.prepare(examples)
 
-        # 导出为 SimCT 训练格式
+        # 导出清洗后的记录（不是未清洗的 examples）为 SimCT 训练格式
         output_dir = os.path.join(
             self.config.data_path, f"agent_slimming_{self.config.role}"
         )
-        self.data_collector.export_for_simct(examples, output_dir)
+        self.data_preparer.export(simct_records, output_dir)
 
         self._steps_completed.append("data_preparation")
         logger.info(f"Data preparation done: {len(simct_records)} records → {output_dir}")

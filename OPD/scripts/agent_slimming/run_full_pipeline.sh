@@ -76,6 +76,7 @@ echo "━━━ Step 0+1: Data Collection & Preparation ━━━"
 python -m agent_slimming.data_collector 2>/dev/null || \
 python -c "
 from agent_slimming.data_collector import DataCollector
+from agent_slimming.data_preparer import DataPreparer
 from agent_slimming.config import SlimmingConfig
 
 config = SlimmingConfig(role='${ROLE}')
@@ -84,9 +85,13 @@ collector = DataCollector(config)
 examples = collector.collect()
 print(f'Collected {len(examples)} examples')
 
-# 导出为 SimCT 格式
+# 清洗（去重、质量过滤、截断、格式标准化）后再导出，不导出原始 examples
+preparer = DataPreparer(config)
+cleaned = preparer.prepare(examples)
+print(f'After cleaning: {len(cleaned)} records')
+
 output_dir = '${DATA_PATH}/agent_slimming_${ROLE}'
-collector.export_for_simct(examples, output_dir)
+preparer.export(cleaned, output_dir)
 print(f'Exported to {output_dir}')
 "
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import random
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Set
 
@@ -66,6 +67,51 @@ class DataPreparer:
         logger.info(f"  Final SimCT records: {len(simct_data)}")
 
         return simct_data
+
+    def export(self, records: List[Dict[str, Any]], output_dir: str) -> str:
+        """
+        把 prepare() 产出的清洗后记录写盘（train/eval 切分 + metadata）。
+
+        Args:
+            records: prepare() 的返回值，已经是最终的
+                {"messages": [...], "label": ...} 格式，无需再转换。
+            output_dir: 输出目录
+
+        Returns:
+            输出目录路径
+        """
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        records = list(records)
+        random.shuffle(records)
+        split_idx = int(len(records) * self.config.train_split)
+        if records and split_idx < 1:
+            # 清洗后样本很少时，避免 train_split 把唯一/极少数据全切进 eval
+            split_idx = 1
+        train_records = records[:split_idx]
+        eval_records = records[split_idx:]
+
+        for filename, subset in (("train.jsonl", train_records), ("eval.jsonl", eval_records)):
+            with open(output_path / filename, "w", encoding="utf-8") as f:
+                for record in subset:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+        metadata = {
+            "role": self.config.role,
+            "num_train": len(train_records),
+            "num_eval": len(eval_records),
+            "teacher_model": self.config.teacher_model,
+            "student_model": self.config.student_model,
+        }
+        with open(output_path / "metadata.json", "w", encoding="utf-8") as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
+
+        logger.info(
+            f"Exported {len(train_records)} train + {len(eval_records)} eval "
+            f"cleaned records to {output_dir}"
+        )
+        return str(output_path)
 
     def _filter_empty_completions(
         self, examples: List[TrainingExample]

@@ -233,55 +233,6 @@ class DataCollector:
             ))
         return examples
 
-    def export_for_simct(self, examples: List[TrainingExample], output_dir: str) -> str:
-        """
-        导出为 SimCT/KDFlow 训练格式。
-
-        输出目录结构：
-          output_dir/
-            train.jsonl    — 训练集 prompt
-            eval.jsonl     — 验证集 prompt
-            metadata.json  — 数据集元信息
-        """
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
-
-        random.shuffle(examples)
-        split_idx = int(len(examples) * self.config.train_split)
-        train_examples = examples[:split_idx]
-        eval_examples = examples[split_idx:]
-
-        # 写入 train.jsonl（SimCT 需要的格式：{"messages": [...]}）
-        self._write_jsonl(output_path / "train.jsonl", train_examples)
-        self._write_jsonl(output_path / "eval.jsonl", eval_examples)
-
-        # 写入元信息
-        metadata = {
-            "role": self.role,
-            "num_train": len(train_examples),
-            "num_eval": len(eval_examples),
-            "teacher_model": self.config.teacher_model,
-            "student_model": self.config.student_model,
-            "collected_at": "",
-        }
-        with open(output_path / "metadata.json", "w", encoding="utf-8") as f:
-            json.dump(metadata, f, ensure_ascii=False, indent=2)
-
-        logger.info(
-            f"Exported {len(train_examples)} train + {len(eval_examples)} eval "
-            f"examples to {output_dir}"
-        )
-        return str(output_path)
-
-    @staticmethod
-    def _write_jsonl(path: Path, examples: List[TrainingExample]) -> None:
-        with open(path, "w", encoding="utf-8") as f:
-            for ex in examples:
-                record = {
-                    "messages": [
-                        {"role": "system", "content": ""},
-                        {"role": "user", "content": ex.prompt},
-                    ],
-                    "label": ex.completion,
-                }
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    # 导出为 SimCT/KDFlow 训练格式的入口现在是 DataPreparer.export()：
+    # 它接收 DataPreparer.prepare() 清洗后的记录，而不是这里的原始 TrainingExample，
+    # 避免未清洗数据被直接导出、以及 ChatML prompt 被二次包裹进 apply_chat_template。

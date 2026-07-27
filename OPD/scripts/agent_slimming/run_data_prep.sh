@@ -43,7 +43,7 @@ for ex in cleaned[:3]:
     preview = ' → '.join([f\"{m['role']}: {m['content'][:50]}...\" for m in msgs[:3]])
     print(f'  Sample: {preview}')
 
-collector.export_for_simct(examples, '${DATA_PATH}/agent_slimming_${ROLE}')
+preparer.export(cleaned, '${DATA_PATH}/agent_slimming_${ROLE}')
 "
 
 echo ""

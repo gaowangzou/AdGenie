@@ -102,8 +102,8 @@ preparer = DataPreparer(config)
 cleaned = preparer.prepare(examples)
 print(f'After cleaning: {len(cleaned)} records')
 
-# 导出
-collector.export_for_simct(examples, '${DATA_PATH}/agent_slimming_personal_agent')
+# 导出（导出清洗后的 cleaned，而不是未清洗的 examples）
+preparer.export(cleaned, '${DATA_PATH}/agent_slimming_personal_agent')
 print('Exported to ${DATA_PATH}/agent_slimming_personal_agent/')
 "
 

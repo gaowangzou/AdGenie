@@ -88,7 +88,7 @@ class SlimmingConfig:
     # ── 蒸馏算法配置 ──────────────────────────────────────────────
     kd_algorithm: Literal["simple_ctkd", "span_ctkd", "span_ctkd_1to1"] = "span_ctkd"
     kd_loss_fn: Literal["kl", "rkl", "js", "tvd", "skewed_kl", "skewed_rkl"] = "rkl"
-    kd_ratio: float = 0.9
+    kd_ratio: float = 1.0
     """KD loss 占比，1-kd_ratio 为 CE loss"""
 
     # ── 训练配置 ──────────────────────────────────────────────────
