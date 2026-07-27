@@ -5,7 +5,9 @@ import json
 import os
 import logging
 from typing import List, Dict, Any, AsyncGenerator, Optional
+from langchain_core.messages import SystemMessage
 from langgraph.prebuilt import create_react_agent
+from app.services.agent_state import AdGenieState, sync_observations, render_state_context
 from app.services.stream_processor import StreamProcessor
 from app.services.prompt import get_full_prompt
 from app.services import skill_service
@@ -83,12 +85,20 @@ def create_agent(current_query: Optional[str] = None, canvas_id: Optional[str] =
         workspace_context=workspace_context,
     )
 
+    def build_prompt(state: AdGenieState) -> List[Any]:
+        """动态 prompt：每次调用模型前，把最新 AdGenieState/Observation 摘要注入 system prompt"""
+        state_context = render_state_context(state)
+        system_text = f"{full_prompt}\n\n{state_context}" if state_context else full_prompt
+        return [SystemMessage(content=system_text)] + list(state["messages"])
+
     # 创建Agent
     agent = create_react_agent(
         name="adgenie_multimodal_agent",
         model=model,
         tools=tools,
-        prompt=full_prompt
+        prompt=build_prompt,
+        state_schema=AdGenieState,
+        pre_model_hook=sync_observations,
     )
     
     logger.info("✅ Agent创建成功")
